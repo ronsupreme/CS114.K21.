@@ -1,0 +1,1293 @@
+
+Open In Colab
+In [30]:
+import getpass
+
+YOUR_API_KEY = getpass.getpass('Enter your API_KEY')
+
+!curl -v -s -H "Content-Type: application/json" \
+    https://vision.googleapis.com/v1/images:annotate?key=$YOUR_API_KEY \
+    --data-binary @request.json
+import os
+
+os.environ['GOOGLE_APPLICATION_CREDENTIALS'] = os.path.join(os.curdir, 'account.json') 
+
+!pip install --upgrade google-cloud-vision
+
+from google.colab.patches import cv2_imshow
+import cv2
+import os
+
+def download_view(img_url):
+  img_file = os.path.basename(img_url)
+  !curl -o $img_file $img_url
+  img = cv2.imread(img_file, cv2.IMREAD_UNCHANGED)
+  cv2_imshow(img)
+  return img_file
+  #@title Nhập URL
+
+img_url = "https://i-vnexpress.vnecdn.net/2020/03/25/my-1-jpeg-2570-1585098851.jpg" #@param {type:"string"}
+
+print(img_url)
+img_file = download_view(img_url)
+print(img_file)
+# https://cloud.google.com/vision/docs/face-tutorial
+
+def detect_face(face_file, max_results=20):
+    """Uses the Vision API to detect faces in the given file.
+
+    Args:
+        face_file: A file-like object containing an image with faces.
+
+    Returns:
+        An array of Face objects with information about the picture.
+    """
+    client = vision.ImageAnnotatorClient()
+
+    content = face_file.read()
+    image = types.Image(content=content)
+
+    return client.face_detection(
+        image=image, max_results=max_results).face_annotations
+        # https://cloud.google.com/vision/docs/face-tutorial
+
+def highlight_faces(image, faces, output_filename):
+    """Draws a polygon around the faces, then saves to output_filename.
+
+    Args:
+      image: a file containing the image with the faces.
+      faces: a list of faces found in the file. This should be in the format
+          returned by the Vision API.
+      output_filename: the name of the image file to be created, where the
+          faces have polygons drawn around them.
+    """
+    im = Image.open(image)
+    draw = ImageDraw.Draw(im)
+    # Sepecify the font-family and the font-size
+    for face in faces:
+        box = [(vertex.x, vertex.y)
+               for vertex in face.bounding_poly.vertices]
+        draw.line(box + [box[0]], width=5, fill='#00ff00')
+        # Place the confidence value/score of the detected faces above the
+        # detection box in the output image
+        draw.text(((face.bounding_poly.vertices)[0].x,
+                   (face.bounding_poly.vertices)[0].y - 30),
+                  str(format(face.detection_confidence, '.3f')) + '%',
+                  fill='#FF0000')
+    im.save(output_filename)
+    from google.cloud import vision
+from google.cloud.vision import types
+from PIL import Image, ImageDraw
+from google.colab.patches import cv2_imshow
+import cv2
+
+output_filename = img_file + '.facedet.jpg'
+max_results = 10
+
+with open(img_file, 'rb') as image:
+    faces = detect_face(image, max_results)
+    print('Found {} face{}'.format(
+        len(faces), '' if len(faces) == 1 else 's'))
+
+    print('Writing to file {}'.format(output_filename))
+    # Reset the file pointer, so we can read the file again
+    image.seek(0)
+    highlight_faces(image, faces, output_filename)
+    img = cv2.imread(output_filename, cv2.IMREAD_UNCHANGED)
+    cv2_imshow(img)
+# https://cloud.google.com/vision/docs/detecting-faces
+
+from google.cloud import vision
+
+def detect_faces_uri(uri):
+    """Detects faces in the file located in Google Cloud Storage or the web."""
+    client = vision.ImageAnnotatorClient()
+    image = vision.types.Image()
+    image.source.image_uri = uri
+
+    response = client.face_detection(image=image)
+    faces = response.face_annotations
+
+    # Names of likelihood from google.cloud.vision.enums
+    likelihood_name = ('UNKNOWN', 'VERY_UNLIKELY', 'UNLIKELY', 'POSSIBLE',
+                       'LIKELY', 'VERY_LIKELY')
+    print('Faces:')
+
+    for face in faces:
+        print('anger: {}'.format(likelihood_name[face.anger_likelihood]))
+        print('joy: {}'.format(likelihood_name[face.joy_likelihood]))
+        print('surprise: {}'.format(likelihood_name[face.surprise_likelihood]))
+
+        vertices = (['({},{})'.format(vertex.x, vertex.y)
+                    for vertex in face.bounding_poly.vertices])
+
+        print('face bounds: {}'.format(','.join(vertices)))
+
+    if response.error.message:
+        raise Exception(
+            '{}\nFor more info on error messages, check: '
+            'https://cloud.google.com/apis/design/errors'.format(
+                response.error.message))
+Enter your API_KEY··········
+*   Trying 74.125.20.95...
+* TCP_NODELAY set
+* Connected to vision.googleapis.com (74.125.20.95) port 443 (#0)
+* ALPN, offering h2
+* ALPN, offering http/1.1
+* successfully set certificate verify locations:
+*   CAfile: /etc/ssl/certs/ca-certificates.crt
+  CApath: /etc/ssl/certs
+* TLSv1.3 (OUT), TLS handshake, Client hello (1):
+* TLSv1.3 (IN), TLS handshake, Server hello (2):
+* TLSv1.3 (IN), TLS Unknown, Certificate Status (22):
+* TLSv1.3 (IN), TLS handshake, Unknown (8):
+* TLSv1.3 (IN), TLS handshake, Certificate (11):
+* TLSv1.3 (IN), TLS handshake, CERT verify (15):
+* TLSv1.3 (IN), TLS handshake, Finished (20):
+* TLSv1.3 (OUT), TLS change cipher, Client hello (1):
+* TLSv1.3 (OUT), TLS Unknown, Certificate Status (22):
+* TLSv1.3 (OUT), TLS handshake, Finished (20):
+* SSL connection using TLSv1.3 / TLS_AES_256_GCM_SHA384
+* ALPN, server accepted to use h2
+* Server certificate:
+*  subject: C=US; ST=California; L=Mountain View; O=Google LLC; CN=upload.video.google.com
+*  start date: Mar 24 06:48:48 2020 GMT
+*  expire date: Jun 16 06:48:48 2020 GMT
+*  subjectAltName: host "vision.googleapis.com" matched cert's "*.googleapis.com"
+*  issuer: C=US; O=Google Trust Services; CN=GTS CA 1O1
+*  SSL certificate verify ok.
+* Using HTTP2, server supports multi-use
+* Connection state changed (HTTP/2 confirmed)
+* Copying HTTP/2 data in stream buffer to connection buffer after upgrade: len=0
+* TLSv1.3 (OUT), TLS Unknown, Unknown (23):
+* TLSv1.3 (OUT), TLS Unknown, Unknown (23):
+* TLSv1.3 (OUT), TLS Unknown, Unknown (23):
+* Using Stream ID: 1 (easy handle 0x563cc72ce000)
+* TLSv1.3 (OUT), TLS Unknown, Unknown (23):
+> POST /v1/images:annotate?key=AIzaSyC6pIJJ5kj_QaVuLrGgnc0aU2bPO6_M8eI HTTP/2
+> Host: vision.googleapis.com
+> User-Agent: curl/7.58.0
+> Accept: */*
+> Content-Type: application/json
+> Content-Length: 515
+> 
+* TLSv1.3 (IN), TLS Unknown, Unknown (23):
+* Connection state changed (MAX_CONCURRENT_STREAMS updated)!
+* TLSv1.3 (OUT), TLS Unknown, Unknown (23):
+* TLSv1.3 (OUT), TLS Unknown, Unknown (23):
+* We are completely uploaded and fine
+* TLSv1.3 (IN), TLS Unknown, Unknown (23):
+* TLSv1.3 (IN), TLS Unknown, Unknown (23):
+< HTTP/2 200 
+< content-type: application/json; charset=UTF-8
+< vary: X-Origin
+< vary: Referer
+< vary: Origin,Accept-Encoding
+< date: Fri, 17 Apr 2020 04:10:56 GMT
+< server: ESF
+< cache-control: private
+< x-xss-protection: 0
+< x-frame-options: SAMEORIGIN
+< x-content-type-options: nosniff
+< accept-ranges: none
+< 
+* TLSv1.3 (IN), TLS Unknown, Unknown (23):
+{
+  "responses": [
+    {
+      "labelAnnotations": [
+        {
+          "mid": "/m/09g5pq",
+          "description": "People",
+          "score": 0.9504782,
+          "topicality": 0.9504782
+        },
+        {
+          "mid": "/m/01c8br",
+          "description": "Street",
+          "score": 0.8911568,
+          "topicality": 0.8911568
+        },
+        {
+          "mid": "/m/079bkr",
+          "description": "Mode of transport",
+          "score": 0.89089024,
+          "topicality": 0.89089024
+        }
+      ],
+      "textAnnotations": [
+        {
+          "locale": "pt-PT",
+          "description": "牛牛面馆\n-019\n10 TB\nAPY\n",
+          "boundingPoly": {
+            "vertices": [
+              {
+                "x": 89,
+                "y": 189
+              },
+              {
+                "x": 2323,
+                "y": 189
+              },
+              {
+                "x": 2323,
+                "y": 1059
+              },
+              {
+                "x": 89,
+                "y": 1059
+              }
+            ]
+          }
+        },
+        {
+          "description": "牛牛",
+          "boundingPoly": {
+            "vertices": [
+              {
+                "x": 89,
+                "y": 192
+              },
+              {
+                "x": 607,
+                "y": 190
+              },
+              {
+* TLSv1.3 (IN), TLS Unknown, Unknown (23):
+                "x": 608,
+                "y": 361
+              },
+              {
+                "x": 90,
+                "y": 363
+              }
+            ]
+          }
+        },
+        {
+          "description": "面",
+          "boundingPoly": {
+            "vertices": [
+              {
+                "x": 609,
+                "y": 190
+              },
+              {
+                "x": 807,
+                "y": 189
+              },
+              {
+                "x": 808,
+                "y": 360
+              },
+              {
+                "x": 610,
+                "y": 361
+              }
+            ]
+          }
+        },
+        {
+          "description": "馆",
+          "boundingPoly": {
+            "vertices": [
+              {
+                "x": 809,
+                "y": 189
+              },
+              {
+                "x": 919,
+                "y": 189
+              },
+              {
+                "x": 920,
+                "y": 360
+              },
+              {
+                "x": 810,
+                "y": 360
+              }
+            ]
+          }
+        },
+        {
+          "description": "-019",
+          "boundingPoly": {
+            "vertices": [
+              {
+                "x": 352,
+                "y": 709
+              },
+              {
+                "x": 385,
+                "y": 697
+              },
+* TLSv1.3 (IN), TLS Unknown, Unknown (23):
+              {
+                "x": 388,
+                "y": 705
+              },
+              {
+                "x": 355,
+                "y": 717
+              }
+            ]
+          }
+        },
+        {
+          "description": "10",
+          "boundingPoly": {
+            "vertices": [
+              {
+                "x": 1284,
+                "y": 1023
+              },
+              {
+                "x": 1323,
+                "y": 1028
+              },
+              {
+                "x": 1319,
+                "y": 1057
+              },
+              {
+                "x": 1280,
+                "y": 1052
+              }
+            ]
+          }
+        },
+        {
+          "description": "TB",
+          "boundingPoly": {
+            "vertices": [
+              {
+                "x": 1317,
+                "y": 1031
+              },
+              {
+                "x": 1360,
+                "y": 1037
+              },
+              {
+                "x": 1357,
+                "y": 1059
+              },
+              {
+                "x": 1314,
+                "y": 1054
+              }
+            ]
+          }
+        },
+        {
+          "description": "APY",
+          "boundingPoly": {
+            "vertices": [
+              {
+                "x": 2298,
+                "y": 936
+              },
+              {
+                "x": 2320,
+* TLSv1.3 (IN), TLS Unknown, Unknown (23):
+                "y": 931
+              },
+              {
+                "x": 2323,
+                "y": 945
+              },
+              {
+                "x": 2301,
+                "y": 950
+              }
+            ]
+          }
+        }
+      ],
+      "fullTextAnnotation": {
+        "pages": [
+          {
+            "property": {
+              "detectedLanguages": [
+                {
+                  "languageCode": "pt",
+                  "confidence": 0.27
+                }
+              ]
+            },
+            "width": 2549,
+            "height": 1703,
+            "blocks": [
+              {
+                "boundingBox": {
+                  "vertices": [
+                    {
+                      "x": 89,
+                      "y": 192
+                    },
+                    {
+                      "x": 919,
+                      "y": 189
+                    },
+                    {
+                      "x": 920,
+                      "y": 360
+                    },
+                    {
+                      "x": 90,
+                      "y": 363
+                    }
+                  ]
+                },
+                "paragraphs": [
+                  {
+                    "boundingBox": {
+                      "vertices": [
+                        {
+                          "x": 89,
+                          "y": 192
+                        },
+* TLSv1.3 (IN), TLS Unknown, Unknown (23):
+                        {
+                          "x": 919,
+                          "y": 189
+                        },
+                        {
+                          "x": 920,
+                          "y": 360
+                        },
+                        {
+                          "x": 90,
+                          "y": 363
+                        }
+                      ]
+                    },
+                    "words": [
+                      {
+                        "boundingBox": {
+                          "vertices": [
+                            {
+                              "x": 89,
+                              "y": 192
+                            },
+                            {
+                              "x": 607,
+                              "y": 190
+                            },
+                            {
+                              "x": 608,
+                              "y": 361
+                            },
+                            {
+                              "x": 90,
+                              "y": 363
+                            }
+                          ]
+                        },
+                        "symbols": [
+                          {
+                            "boundingBox": {
+                              "vertices": [
+                                {
+* TLSv1.3 (IN), TLS Unknown, Unknown (23):
+                                  "x": 89,
+                                  "y": 192
+                                },
+                                {
+                                  "x": 375,
+                                  "y": 191
+                                },
+                                {
+                                  "x": 376,
+                                  "y": 362
+                                },
+                                {
+                                  "x": 90,
+                                  "y": 363
+                                }
+                              ]
+                            },
+                            "text": "牛"
+                          },
+                          {
+                            "boundingBox": {
+                              "vertices": [
+                                {
+                                  "x": 376,
+                                  "y": 191
+                                },
+                                {
+                                  "x": 607,
+                                  "y": 190
+                                },
+                                {
+                                  "x": 608,
+                                  "y": 361
+                                },
+* TLSv1.3 (IN), TLS Unknown, Unknown (23):
+                                {
+                                  "x": 377,
+                                  "y": 362
+                                }
+                              ]
+                            },
+                            "text": "牛"
+                          }
+                        ]
+                      },
+                      {
+                        "boundingBox": {
+                          "vertices": [
+                            {
+                              "x": 609,
+                              "y": 190
+                            },
+                            {
+                              "x": 807,
+                              "y": 189
+                            },
+                            {
+                              "x": 808,
+                              "y": 360
+                            },
+                            {
+                              "x": 610,
+                              "y": 361
+                            }
+                          ]
+                        },
+                        "symbols": [
+                          {
+                            "boundingBox": {
+                              "vertices": [
+                                {
+                                  "x": 609,
+                                  "y": 190
+                                },
+* TLSv1.3 (IN), TLS Unknown, Unknown (23):
+                                {
+                                  "x": 807,
+                                  "y": 189
+                                },
+                                {
+                                  "x": 808,
+                                  "y": 360
+                                },
+                                {
+                                  "x": 610,
+                                  "y": 361
+                                }
+                              ]
+                            },
+                            "text": "面"
+                          }
+                        ]
+                      },
+                      {
+                        "boundingBox": {
+                          "vertices": [
+                            {
+                              "x": 809,
+                              "y": 189
+                            },
+                            {
+                              "x": 919,
+                              "y": 189
+                            },
+                            {
+                              "x": 920,
+                              "y": 360
+                            },
+                            {
+                              "x": 810,
+                              "y": 360
+                            }
+                          ]
+                        },
+* TLSv1.3 (IN), TLS Unknown, Unknown (23):
+                        "symbols": [
+                          {
+                            "property": {
+                              "detectedBreak": {
+                                "type": "EOL_SURE_SPACE"
+                              }
+                            },
+                            "boundingBox": {
+                              "vertices": [
+                                {
+                                  "x": 809,
+                                  "y": 189
+                                },
+                                {
+                                  "x": 919,
+                                  "y": 189
+                                },
+                                {
+                                  "x": 920,
+                                  "y": 360
+                                },
+                                {
+                                  "x": 810,
+                                  "y": 360
+                                }
+                              ]
+                            },
+                            "text": "馆"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ],
+                "blockType": "TEXT"
+              },
+              {
+                "boundingBox": {
+                  "vertices": [
+                    {
+* TLSv1.3 (IN), TLS Unknown, Unknown (23):
+                      "x": 352,
+                      "y": 709
+                    },
+                    {
+                      "x": 385,
+                      "y": 697
+                    },
+                    {
+                      "x": 388,
+                      "y": 705
+                    },
+                    {
+                      "x": 355,
+                      "y": 717
+                    }
+                  ]
+                },
+                "paragraphs": [
+                  {
+                    "boundingBox": {
+                      "vertices": [
+                        {
+                          "x": 352,
+                          "y": 709
+                        },
+                        {
+                          "x": 385,
+                          "y": 697
+                        },
+                        {
+                          "x": 388,
+                          "y": 705
+                        },
+                        {
+                          "x": 355,
+                          "y": 717
+                        }
+                      ]
+                    },
+                    "words": [
+                      {
+                        "boundingBox": {
+                          "vertices": [
+                            {
+                              "x": 352,
+                              "y": 709
+                            },
+* TLSv1.3 (IN), TLS Unknown, Unknown (23):
+                            {
+                              "x": 385,
+                              "y": 697
+                            },
+                            {
+                              "x": 388,
+                              "y": 705
+                            },
+                            {
+                              "x": 355,
+                              "y": 717
+                            }
+                          ]
+                        },
+                        "symbols": [
+                          {
+                            "boundingBox": {
+                              "vertices": [
+                                {
+                                  "x": 352,
+                                  "y": 709
+                                },
+                                {
+                                  "x": 364,
+                                  "y": 705
+                                },
+                                {
+                                  "x": 367,
+                                  "y": 712
+                                },
+                                {
+                                  "x": 355,
+                                  "y": 717
+                                }
+                              ]
+                            },
+                            "text": "-"
+                          },
+* TLSv1.3 (IN), TLS Unknown, Unknown (23):
+                          {
+                            "boundingBox": {
+                              "vertices": [
+                                {
+                                  "x": 366,
+                                  "y": 704
+                                },
+                                {
+                                  "x": 372,
+                                  "y": 702
+                                },
+                                {
+                                  "x": 374,
+                                  "y": 708
+                                },
+                                {
+                                  "x": 368,
+                                  "y": 710
+                                }
+                              ]
+                            },
+                            "text": "0"
+                          },
+                          {
+                            "boundingBox": {
+                              "vertices": [
+                                {
+                                  "x": 375,
+                                  "y": 701
+                                },
+                                {
+                                  "x": 377,
+                                  "y": 700
+* TLSv1.3 (IN), TLS Unknown, Unknown (23):
+                                },
+                                {
+                                  "x": 379,
+                                  "y": 706
+                                },
+                                {
+                                  "x": 377,
+                                  "y": 707
+                                }
+                              ]
+                            },
+                            "text": "1"
+                          },
+                          {
+                            "property": {
+                              "detectedBreak": {
+                                "type": "EOL_SURE_SPACE"
+                              }
+                            },
+                            "boundingBox": {
+                              "vertices": [
+                                {
+                                  "x": 381,
+                                  "y": 700
+                                },
+                                {
+                                  "x": 386,
+                                  "y": 698
+                                },
+                                {
+                                  "x": 388,
+                                  "y": 704
+                                },
+                                {
+                                  "x": 383,
+                                  "y": 706
+* TLSv1.3 (IN), TLS Unknown, Unknown (23):
+                                }
+                              ]
+                            },
+                            "text": "9"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ],
+                "blockType": "TEXT"
+              },
+              {
+                "property": {
+                  "detectedLanguages": [
+                    {
+                      "languageCode": "pt",
+                      "confidence": 1
+                    }
+                  ]
+                },
+                "boundingBox": {
+                  "vertices": [
+                    {
+                      "x": 1284,
+                      "y": 1023
+                    },
+                    {
+                      "x": 1360,
+                      "y": 1033
+                    },
+                    {
+                      "x": 1357,
+                      "y": 1062
+                    },
+                    {
+                      "x": 1280,
+                      "y": 1052
+                    }
+                  ]
+                },
+                "paragraphs": [
+                  {
+                    "property": {
+                      "detectedLanguages": [
+                        {
+                          "languageCode": "pt",
+                          "confidence": 1
+                        }
+* TLSv1.3 (IN), TLS Unknown, Unknown (23):
+                      ]
+                    },
+                    "boundingBox": {
+                      "vertices": [
+                        {
+                          "x": 1284,
+                          "y": 1023
+                        },
+                        {
+                          "x": 1360,
+                          "y": 1033
+                        },
+                        {
+                          "x": 1357,
+                          "y": 1062
+                        },
+                        {
+                          "x": 1280,
+                          "y": 1052
+                        }
+                      ]
+                    },
+                    "words": [
+                      {
+                        "property": {
+                          "detectedLanguages": [
+                            {
+                              "languageCode": "pt"
+                            }
+                          ]
+                        },
+                        "boundingBox": {
+                          "vertices": [
+                            {
+                              "x": 1284,
+                              "y": 1023
+                            },
+                            {
+                              "x": 1323,
+                              "y": 1028
+                            },
+                            {
+* TLSv1.3 (IN), TLS Unknown, Unknown (23):
+                              "x": 1319,
+                              "y": 1057
+                            },
+                            {
+                              "x": 1280,
+                              "y": 1052
+                            }
+                          ]
+                        },
+                        "symbols": [
+                          {
+                            "property": {
+                              "detectedLanguages": [
+                                {
+                                  "languageCode": "pt"
+                                }
+                              ]
+                            },
+                            "boundingBox": {
+                              "vertices": [
+                                {
+                                  "x": 1284,
+                                  "y": 1023
+                                },
+                                {
+                                  "x": 1313,
+                                  "y": 1027
+                                },
+                                {
+                                  "x": 1309,
+                                  "y": 1055
+                                },
+                                {
+                                  "x": 1280,
+                                  "y": 1052
+                                }
+* TLSv1.3 (IN), TLS Unknown, Unknown (23):
+                              ]
+                            },
+                            "text": "1"
+                          },
+                          {
+                            "property": {
+                              "detectedLanguages": [
+                                {
+                                  "languageCode": "pt"
+                                }
+                              ],
+                              "detectedBreak": {
+                                "type": "SPACE"
+                              }
+                            },
+                            "boundingBox": {
+                              "vertices": [
+                                {
+                                  "x": 1314,
+                                  "y": 1027
+                                },
+                                {
+                                  "x": 1323,
+                                  "y": 1028
+                                },
+                                {
+                                  "x": 1319,
+                                  "y": 1057
+                                },
+                                {
+                                  "x": 1310,
+                                  "y": 1056
+                                }
+                              ]
+                            },
+                            "text": "0"
+* TLSv1.3 (IN), TLS Unknown, Unknown (23):
+                          }
+                        ]
+                      },
+                      {
+                        "property": {
+                          "detectedLanguages": [
+                            {
+                              "languageCode": "pt"
+                            }
+                          ]
+                        },
+                        "boundingBox": {
+                          "vertices": [
+                            {
+                              "x": 1317,
+                              "y": 1031
+                            },
+                            {
+                              "x": 1360,
+                              "y": 1037
+                            },
+                            {
+                              "x": 1357,
+                              "y": 1059
+                            },
+                            {
+                              "x": 1314,
+                              "y": 1054
+                            }
+                          ]
+                        },
+                        "symbols": [
+                          {
+                            "property": {
+                              "detectedLanguages": [
+                                {
+* TLSv1.3 (IN), TLS Unknown, Unknown (23):
+                                  "languageCode": "pt"
+                                }
+                              ]
+                            },
+                            "boundingBox": {
+                              "vertices": [
+                                {
+                                  "x": 1317,
+                                  "y": 1033
+                                },
+                                {
+                                  "x": 1333,
+                                  "y": 1035
+                                },
+                                {
+                                  "x": 1330,
+                                  "y": 1056
+                                },
+                                {
+                                  "x": 1314,
+                                  "y": 1054
+                                }
+                              ]
+                            },
+                            "text": "T"
+                          },
+                          {
+                            "property": {
+                              "detectedLanguages": [
+                                {
+                                  "languageCode": "pt"
+                                }
+                              ],
+                              "detectedBreak": {
+                                "type": "EOL_SURE_SPACE"
+* TLSv1.3 (IN), TLS Unknown, Unknown (23):
+                              }
+                            },
+                            "boundingBox": {
+                              "vertices": [
+                                {
+                                  "x": 1339,
+                                  "y": 1034
+                                },
+                                {
+                                  "x": 1359,
+                                  "y": 1037
+                                },
+                                {
+                                  "x": 1356,
+                                  "y": 1057
+                                },
+                                {
+                                  "x": 1336,
+                                  "y": 1055
+                                }
+                              ]
+                            },
+                            "text": "B"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ],
+                "blockType": "TEXT"
+              },
+              {
+                "boundingBox": {
+                  "vertices": [
+                    {
+                      "x": 2298,
+                      "y": 936
+                    },
+                    {
+                      "x": 2320,
+                      "y": 931
+                    },
+                    {
+* TLSv1.3 (IN), TLS Unknown, Unknown (23):
+                      "x": 2323,
+                      "y": 945
+                    },
+                    {
+                      "x": 2301,
+                      "y": 950
+                    }
+                  ]
+                },
+                "paragraphs": [
+                  {
+                    "boundingBox": {
+                      "vertices": [
+                        {
+                          "x": 2298,
+                          "y": 936
+                        },
+                        {
+                          "x": 2320,
+                          "y": 931
+                        },
+                        {
+                          "x": 2323,
+                          "y": 945
+                        },
+                        {
+                          "x": 2301,
+                          "y": 950
+                        }
+                      ]
+                    },
+                    "words": [
+                      {
+                        "boundingBox": {
+                          "vertices": [
+                            {
+                              "x": 2298,
+                              "y": 936
+                            },
+                            {
+                              "x": 2320,
+                              "y": 931
+                            },
+                            {
+                              "x": 2323,
+* TLSv1.3 (IN), TLS Unknown, Unknown (23):
+                              "y": 945
+                            },
+                            {
+                              "x": 2301,
+                              "y": 950
+                            }
+                          ]
+                        },
+                        "symbols": [
+                          {
+                            "boundingBox": {
+                              "vertices": [
+                                {
+                                  "x": 2298,
+                                  "y": 936
+                                },
+                                {
+                                  "x": 2304,
+                                  "y": 935
+                                },
+                                {
+                                  "x": 2306,
+                                  "y": 945
+                                },
+                                {
+                                  "x": 2300,
+                                  "y": 946
+                                }
+                              ]
+                            },
+                            "text": "A"
+                          },
+                          {
+                            "boundingBox": {
+                              "vertices": [
+                                {
+                                  "x": 2307,
+* TLSv1.3 (IN), TLS Unknown, Unknown (23):
+                                  "y": 934
+                                },
+                                {
+                                  "x": 2318,
+                                  "y": 932
+                                },
+                                {
+                                  "x": 2321,
+                                  "y": 945
+                                },
+                                {
+                                  "x": 2310,
+                                  "y": 948
+                                }
+                              ]
+                            },
+                            "text": "P"
+                          },
+                          {
+                            "property": {
+                              "detectedBreak": {
+                                "type": "EOL_SURE_SPACE"
+                              }
+                            },
+                            "boundingBox": {
+                              "vertices": [
+                                {
+                                  "x": 2320,
+                                  "y": 937
+                                },
+                                {
+                                  "x": 2322,
+                                  "y": 937
+                                },
+                                {
+                                  "x": 2323,
+* TLSv1.3 (IN), TLS Unknown, Unknown (23):
+                                  "y": 941
+                                },
+                                {
+                                  "x": 2321,
+                                  "y": 942
+                                }
+                              ]
+                            },
+                            "text": "Y"
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ],
+                "blockType": "TEXT"
+              }
+            ]
+          }
+        ],
+        "text": "牛牛面馆\n-019\n10 TB\nAPY\n"
+      },
+      "localizedObjectAnnotations": [
+        {
+          "mid": "/m/01g317",
+          "name": "Person",
+          "score": 0.8708011,
+          "boundingPoly": {
+            "normalizedVertices": [
+              {
+                "x": 0.2741305,
+                "y": 0.4361602
+              },
+              {
+                "x": 0.40742353,
+                "y": 0.4361602
+              },
+              {
+                "x": 0.40742353,
+                "y": 0.89029723
+              },
+              {
+                "x": 0.2741305,
+                "y": 0.89029723
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}
+* TLSv1.3 (IN), TLS Unknown, Unknown (23):
+* TLSv1.3 (OUT), TLS Unknown, Unknown (23):
+* Connection #0 to host vision.googleapis.com left intact
+Requirement already up-to-date: google-cloud-vision in /usr/local/lib/python3.6/dist-packages (1.0.0)
+Requirement already satisfied, skipping upgrade: google-api-core[grpc]<2.0.0dev,>=1.14.0 in /usr/local/lib/python3.6/dist-packages (from google-cloud-vision) (1.16.0)
+Requirement already satisfied, skipping upgrade: protobuf>=3.4.0 in /usr/local/lib/python3.6/dist-packages (from google-api-core[grpc]<2.0.0dev,>=1.14.0->google-cloud-vision) (3.10.0)
+Requirement already satisfied, skipping upgrade: six>=1.10.0 in /usr/local/lib/python3.6/dist-packages (from google-api-core[grpc]<2.0.0dev,>=1.14.0->google-cloud-vision) (1.12.0)
+Requirement already satisfied, skipping upgrade: setuptools>=34.0.0 in /usr/local/lib/python3.6/dist-packages (from google-api-core[grpc]<2.0.0dev,>=1.14.0->google-cloud-vision) (46.1.3)
+Requirement already satisfied, skipping upgrade: google-auth<2.0dev,>=0.4.0 in /usr/local/lib/python3.6/dist-packages (from google-api-core[grpc]<2.0.0dev,>=1.14.0->google-cloud-vision) (1.7.2)
+Requirement already satisfied, skipping upgrade: requests<3.0.0dev,>=2.18.0 in /usr/local/lib/python3.6/dist-packages (from google-api-core[grpc]<2.0.0dev,>=1.14.0->google-cloud-vision) (2.21.0)
+Requirement already satisfied, skipping upgrade: googleapis-common-protos<2.0dev,>=1.6.0 in /usr/local/lib/python3.6/dist-packages (from google-api-core[grpc]<2.0.0dev,>=1.14.0->google-cloud-vision) (1.51.0)
+Requirement already satisfied, skipping upgrade: pytz in /usr/local/lib/python3.6/dist-packages (from google-api-core[grpc]<2.0.0dev,>=1.14.0->google-cloud-vision) (2018.9)
+Requirement already satisfied, skipping upgrade: grpcio<2.0dev,>=1.8.2; extra == "grpc" in /usr/local/lib/python3.6/dist-packages (from google-api-core[grpc]<2.0.0dev,>=1.14.0->google-cloud-vision) (1.28.1)
+Requirement already satisfied, skipping upgrade: cachetools<3.2,>=2.0.0 in /usr/local/lib/python3.6/dist-packages (from google-auth<2.0dev,>=0.4.0->google-api-core[grpc]<2.0.0dev,>=1.14.0->google-cloud-vision) (3.1.1)
+Requirement already satisfied, skipping upgrade: pyasn1-modules>=0.2.1 in /usr/local/lib/python3.6/dist-packages (from google-auth<2.0dev,>=0.4.0->google-api-core[grpc]<2.0.0dev,>=1.14.0->google-cloud-vision) (0.2.8)
+Requirement already satisfied, skipping upgrade: rsa<4.1,>=3.1.4 in /usr/local/lib/python3.6/dist-packages (from google-auth<2.0dev,>=0.4.0->google-api-core[grpc]<2.0.0dev,>=1.14.0->google-cloud-vision) (4.0)
+Requirement already satisfied, skipping upgrade: chardet<3.1.0,>=3.0.2 in /usr/local/lib/python3.6/dist-packages (from requests<3.0.0dev,>=2.18.0->google-api-core[grpc]<2.0.0dev,>=1.14.0->google-cloud-vision) (3.0.4)
+Requirement already satisfied, skipping upgrade: idna<2.9,>=2.5 in /usr/local/lib/python3.6/dist-packages (from requests<3.0.0dev,>=2.18.0->google-api-core[grpc]<2.0.0dev,>=1.14.0->google-cloud-vision) (2.8)
+Requirement already satisfied, skipping upgrade: certifi>=2017.4.17 in /usr/local/lib/python3.6/dist-packages (from requests<3.0.0dev,>=2.18.0->google-api-core[grpc]<2.0.0dev,>=1.14.0->google-cloud-vision) (2020.4.5.1)
+Requirement already satisfied, skipping upgrade: urllib3<1.25,>=1.21.1 in /usr/local/lib/python3.6/dist-packages (from requests<3.0.0dev,>=2.18.0->google-api-core[grpc]<2.0.0dev,>=1.14.0->google-cloud-vision) (1.24.3)
+Requirement already satisfied, skipping upgrade: pyasn1<0.5.0,>=0.4.6 in /usr/local/lib/python3.6/dist-packages (from pyasn1-modules>=0.2.1->google-auth<2.0dev,>=0.4.0->google-api-core[grpc]<2.0.0dev,>=1.14.0->google-cloud-vision) (0.4.8)
+https://i-vnexpress.vnecdn.net/2020/03/25/my-1-jpeg-2570-1585098851.jpg
+  % Total    % Received % Xferd  Average Speed   Time    Time     Time  Current
+                                 Dload  Upload   Total   Spent    Left  Speed
+100 75143  100 75143    0     0  72114      0  0:00:01  0:00:01 --:--:-- 72114
+
+my-1-jpeg-2570-1585098851.jpg
+Found 4 faces
+Writing to file my-1-jpeg-2570-1585098851.jpg.facedet.jpg
